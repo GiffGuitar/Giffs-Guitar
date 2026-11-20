@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guitar sound check</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    background: #f6f1e7; color: #3b2a1a;
+  }
+  h1 { font-size: 2.4rem; margin: 0 0 .4rem; }
+  p.hint { font-size: 1.2rem; margin: 0 0 2rem; color: #6b5440; }
+  .buttons { display: grid; grid-template-columns: repeat(3, 9rem); gap: 1.2rem; justify-content: center; }
+  button {
+    font: inherit; font-size: 2.4rem; font-weight: 700;
+    height: 9rem; border: none; border-radius: 1.4rem; cursor: pointer;
+    background: #c8873e; color: #fff;
+    box-shadow: 0 .4rem 0 #8f5a22, 0 .6rem 1.2rem rgba(0,0,0,.15);
+    transition: transform .06s, background .15s, box-shadow .06s;
+  }
+  button:active { transform: translateY(.3rem); box-shadow: 0 .1rem 0 #8f5a22; }
+  button.wide { grid-column: 1 / -1; font-size: 1.6rem; height: 6rem; background: #4f7f5a; box-shadow: 0 .4rem 0 #2f5538, 0 .6rem 1.2rem rgba(0,0,0,.15); }
+  button.playing { background: #f2b84b; box-shadow: 0 0 0 .35rem #ffe08a, 0 .4rem 0 #b9822a; animation: pulse .35s ease-in-out infinite alternate; }
+  button.wide.playing { background: #7fbf8a; box-shadow: 0 0 0 .35rem #c9f0cf, 0 .4rem 0 #2f5538; }
+  @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.15); } }
+  .volume { margin-top: 2.2rem; display: flex; align-items: center; gap: .7rem; font-size: 1rem; color: #6b5440; }
+  .volume input { width: 10rem; accent-color: #c8873e; }
+</style>
+</head>
+<body>
+  <h1>Guitar sound check</h1>
+  <p class="hint">Click a button to listen</p>
+  <div class="buttons">
+    <button type="button" data-play="G">G</button>
+    <button type="button" data-play="C">C</button>
+    <button type="button" data-play="D">D</button>
+    <button type="button" class="wide" data-play="twinkle">Twinkle Twinkle, first line</button>
+  </div>
+  <label class="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
+
+<script>
+"use strict";
+(function () {
+  // ---------- Music data ----------
+  // Standard tuning, low to high: E2 A2 D3 G3 B3 E4 (MIDI note numbers)
+  const OPEN_STRINGS = [40, 45, 50, 55, 59, 64];
+  // Fret per string, low E to high E. null = muted (x)
+  const CHORDS = {
+    G: [3, 2, 0, 0, 0, 3],
+    C: [null, 3, 2, 0, 1, 0],
+    D: [null, null, 0, 2, 3, 2]
+  };
+  const midiToHz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  // ---------- Karplus-Strong pluck renderer ----------
+  // Renders one plucked steel string into a Float32Array (cached per pitch/tone).
+  function renderPluck(freq, sampleRate, opts) {
+    const bright = opts.bright;            // 0..1, pick brightness
+    // Lower strings ring longer and stay warm; B and high E die away sooner so they don't hang on.
+    // T60: low E ~7 s, A ~5.9, D ~5, G ~3.9, B ~2.6, high E and melody notes ~1.8 s
+    const t60 = Math.max(1.8, Math.min(7.0,
+      7.0 * Math.pow(82.41 / freq, 0.55) * (freq > 180 ? Math.pow(180 / freq, 1.2) : 1)));
+    const dur = Math.min(t60 * 0.8, 5.5);
+    const len = Math.floor(dur * sampleRate);
+    const out = new Float32Array(len);
+
+    // Loop delay: integer delay N + 1 (3-tap lowpass) + allpass fractional delay
+    const P = sampleRate / freq;
+    let N = Math.floor(P - 1);
+    let frac = P - 1 - N;
+    if (frac < 0.1) { N -= 1; frac += 1; }
+    const C = (1 - frac) / (1 + frac);
+
+    // Per-period loss so the fundamental reaches -60 dB at t60
+    const gTarget = Math.pow(10, -3 / (t60 * freq));
+    // 3-tap loop filter [0.15 0.7 0.15]: damps the highs ~20% faster than the classic 2-point average
+    const loopGain = 0.7 + 0.3 * Math.cos(2 * Math.PI * freq / sampleRate);
+    const rho = Math.min(0.99995, gTarget / loopGain);
+
+    // Excitation: the string pulled into a triangle shape at the pick point
+    // (gives a solid fundamental), plus a little low-passed noise for pick texture.
+    const pickPos = Math.max(2, Math.round(N * 0.16)); // plucked further from the bridge = rounder tone
+    const delay = new Float32Array(N);
+    let lp = 0;
+    const a = 0.15 + 0.4 * bright;           // noise is low-passed
+    const noiseAmt = 0.12 + 0.28 * bright;
+    for (let i = 0; i < N; i++) {
+      const tri = i < pickPos ? i / pickPos : (N - i) / (N - pickPos);
+      lp += a * ((Math.random() * 2 - 1) - lp);
+      delay[i] = tri + noiseAmt * lp;
+    }
+    // Round off the triangle's corner (a soft flesh-and-pick attack rather than a sharp edge)
+    const smooth = 1 + Math.round((1 - bright) * 3);
+    for (let pass = 0; pass < smooth; pass++) {
+      let p0 = delay[N - 1];
+      for (let i = 0; i < N; i++) { const c = delay[i]; delay[i] = 0.25 * p0 + 0.5 * c + 0.25 * delay[(i + 1) % N]; p0 = c; }
+    }
+    let mean = 0;
+    for (let i = 0; i < N; i++) mean += delay[i];
+    mean /= N;
+    let peak = 1e-9;
+    for (let i = 0; i < N; i++) { delay[i] -= mean; peak = Math.max(peak, Math.abs(delay[i])); }
+    for (let i = 0; i < N; i++) delay[i] /= peak;
+
+    // The loop
+    let ptr = 0, prev = 0, prev2 = 0, apIn = 0, apOut = 0;
+    for (let n = 0; n < len; n++) {
+      const v = delay[ptr];
+      const avg = rho * (0.15 * v + 0.7 * prev + 0.15 * prev2); // lowpass decay with damping
+      prev2 = prev; prev = v;
+      const ap = C * avg + apIn - C * apOut; // fine tuning
+      apIn = avg; apOut = ap;
+      delay[ptr] = ap;
+      out[n] = v;
+      ptr++; if (ptr >= N) ptr = 0;
+    }
+
+    // Pick noise: a faint, low-passed thump on the attack
+    const clickLen = Math.floor(0.006 * sampleRate);
+    let cl = 0;
+    for (let n = 0; n < clickLen; n++) {
+      cl += 0.15 * ((Math.random() * 2 - 1) - cl);
+      out[n] += cl * 0.03 * bright * Math.pow(1 - n / clickLen, 2);
+    }
+
+    // DC blocker, then a soft fade at the very end of the buffer
+    let x1 = 0, y1 = 0;
+    for (let n = 0; n < len; n++) {
+      const y = out[n] - x1 + 0.995 * y1;
+      x1 = out[n]; y1 = y; out[n] = y;
+    }
+    const fadeIn = Math.floor(0.004 * sampleRate);   // ~4 ms raised-cosine fade-in rounds the attack
+    for (let n = 0; n < fadeIn; n++) out[n] *= 0.5 - 0.5 * Math.cos(Math.PI * n / fadeIn);
+    const fade = Math.floor(0.4 * sampleRate);
+    for (let n = 0; n < fade; n++) out[len - 1 - n] *= n / fade;
+
+    // Normalize
+    let pk = 1e-9;
+    for (let n = 0; n < len; n++) pk = Math.max(pk, Math.abs(out[n]));
+    for (let n = 0; n < len; n++) out[n] /= pk;
+    return out;
+  }
+
+  // ---------- Reverb impulse (short, subtle room) ----------
+  function makeImpulse(ctx) {
+    const sr = ctx.sampleRate, len = Math.floor(1.1 * sr), pre = Math.floor(0.012 * sr);
+    const buf = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for (let n = pre; n < len; n++) {
+        const t = (n - pre) / sr;
+        lp += 0.2 * ((Math.random() * 2 - 1) - lp);    // dark tail
+        d[n] = lp * Math.exp(-t * 6.0);
+      }
+    }
+    return buf;
+  }
+
+  // ---------- Audio engine (works with live or offline contexts) ----------
+  function createEngine(ctx) {
+    const cache = new Map();
+    function getBuffer(midi, tone) {
+      const key = midi + ":" + tone;
+      if (!cache.has(key)) {
+        const bright = tone === "melody" ? 0.65 : tone === "soft" ? 0.4 : 0.55;
+        const data = renderPluck(midiToHz(midi), ctx.sampleRate, { bright });
+        const buf = ctx.createBuffer(1, data.length, ctx.sampleRate);
+        buf.getChannelData(0).set(data);
+        cache.set(key, buf);
+      }
+      return cache.get(key);
+    }
+
+    // Signal chain: voices -> body EQ -> (dry + room reverb) -> master -> compressor -> out
+    const body = ctx.createGain();
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 70; hp.Q.value = 0.7;
+    const air = ctx.createBiquadFilter(); air.type = "peaking"; air.frequency.value = 105; air.Q.value = 2.0; air.gain.value = 2;
+    const top = ctx.createBiquadFilter(); top.type = "peaking"; top.frequency.value = 220; top.Q.value = 1.0; top.gain.value = 2.5; // low-mid warmth
+    const mud = ctx.createBiquadFilter(); mud.type = "peaking"; mud.frequency.value = 500; mud.Q.value = 1.0; mud.gain.value = -1.5;
+    const pres = ctx.createBiquadFilter(); pres.type = "highshelf"; pres.frequency.value = 3500; pres.gain.value = -6; // tame the edge
+    const shelf = ctx.createBiquadFilter(); shelf.type = "lowpass"; shelf.frequency.value = 10000; shelf.Q.value = 0.6;  // gentle top roll-off
+    body.connect(hp); hp.connect(air); air.connect(top); top.connect(mud); mud.connect(pres); pres.connect(shelf);
+
+    const dry = ctx.createGain(); dry.gain.value = 0.85;
+    const wet = ctx.createGain(); wet.gain.value = 0.18;
+    const verb = ctx.createConvolver(); verb.buffer = makeImpulse(ctx);
+    shelf.connect(dry); shelf.connect(verb); verb.connect(wet);
+
+    const master = ctx.createGain(); master.gain.value = 0.8;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.knee.value = 8; comp.ratio.value = 4;
+    comp.attack.value = 0.003; comp.release.value = 0.25;
+    dry.connect(master); wet.connect(master); master.connect(comp); comp.connect(ctx.destination);
+
+    // Track ringing voices so a new pluck damps the old one on the same string
+    const ringing = {};
+    function pluck(slot, midi, time, gain, tone, pan) {
+      const old = ringing[slot];
+      if (old) {
+        old.g.gain.cancelScheduledValues(time);
+        old.g.gain.setTargetAtTime(0, time, 0.012);
+        try { old.src.stop(time + 0.1); } catch (e) {}
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = getBuffer(midi, tone);
+      const g = ctx.createGain(); g.gain.value = gain;
+      const p = ctx.createStereoPanner(); p.pan.value = pan;
+      src.connect(g); g.connect(p); p.connect(body);
+      src.start(time);
+      ringing[slot] = { src, g };
+      return { src, g };
+    }
+
+    const STRING_LEVEL = [1.0, 1.0, 0.95, 0.88, 0.76, 0.7]; // high strings a little quieter
+    function strum(name, time, level, toneOverride) {
+      const frets = CHORDS[name];
+      let t = time;
+      let firstDone = false;
+      for (let s = 0; s < 6; s++) {
+        if (frets[s] === null) continue;
+        if (firstDone) t += 0.020 + Math.random() * 0.010;      // 20-30 ms between strings
+        firstDone = true;
+        const vel = level * (0.9 + Math.random() * 0.2);         // slight loudness variation
+        const tone = toneOverride || (level < 0.6 ? "soft" : "normal");
+        pluck("s" + s, OPEN_STRINGS[s] + frets[s], t, vel * 0.34 * STRING_LEVEL[s], tone, -0.18 + s * 0.07);
+      }
+      return t - time;
+    }
+
+    function release(time, seconds) {
+      Object.keys(ringing).forEach(k => {
+        const v = ringing[k];
+        v.g.gain.cancelScheduledValues(time);
+        v.g.gain.setTargetAtTime(0, time, seconds / 4);
+        try { v.src.stop(time + seconds + 0.2); } catch (e) {}
+      });
+    }
+
+    // Twinkle Twinkle, first line, key of G, 90 BPM
+    // Melody G4 G4 D5 D5 E5 E5 D5(half) | chords: G (beat 1), C on "lit-tle" (beat 5), G on "star" (beat 7)
+    const TWINKLE = [[67, 1], [67, 1], [74, 1], [74, 1], [76, 1], [76, 1], [74, 2]];
+    const TWINKLE_CHORDS = [["G", 0], ["C", 4], ["G", 6]];
+    function twinkle(time) {
+      const beat = 60 / 90;
+      TWINKLE_CHORDS.forEach(([c, b]) => strum(c, time + b * beat, 0.56, "soft")); // same soft tone, ~3.4 dB louder than v2
+      let b = 0;
+      TWINKLE.forEach(([m, len]) => {
+        const jitter = (Math.random() - 0.5) * 0.008;
+        pluck("melody", m, time + b * beat + jitter, 1.0 * (0.95 + Math.random() * 0.1), "melody", 0.05);
+        b += len;
+      });
+      const end = time + b * beat;
+      release(end, 1.2);
+      return b * beat + 1.2;
+    }
+
+    return {
+      master,
+      play(what, time) {
+        if (what === "twinkle") return twinkle(time);
+        strum(what, time, 0.85);
+        return 2.0;
+      },
+      warm() { // pre-render the buffers so the first click is instant
+        Object.values(CHORDS).forEach(f => f.forEach((fr, s) => {
+          if (fr !== null) { getBuffer(OPEN_STRINGS[s] + fr, "normal"); getBuffer(OPEN_STRINGS[s] + fr, "soft"); }
+        }));
+        [67, 74, 76].forEach(m => getBuffer(m, "melody"));
+      }
+    };
+  }
+
+  // ---------- Page wiring ----------
+  let ctx = null, engine = null;
+  const vol = document.getElementById("volume");
+  function volumeGain() { const v = vol.value / 100; return v * v; }
+
+  async function ensureAudio() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      engine = createEngine(ctx);
+      engine.master.gain.value = volumeGain();
+      engine.warm();
+    }
+    if (ctx.state !== "running") await ctx.resume();
+  }
+
+  vol.addEventListener("input", () => {
+    if (engine) engine.master.gain.setTargetAtTime(volumeGain(), ctx.currentTime, 0.02);
+  });
+
+  const timers = new WeakMap();
+  document.querySelectorAll("button[data-play]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await ensureAudio();
+      const length = engine.play(btn.dataset.play, ctx.currentTime + 0.05);
+      btn.classList.add("playing");
+      clearTimeout(timers.get(btn));
+      timers.set(btn, setTimeout(() => btn.classList.remove("playing"), Math.min(length, 6) * 1000));
+    });
+  });
+
+  // Offline render hook used only for automated testing (not visible on the page)
+  window.__renderSoundCheckPreview = async function (sampleRate, masterGain) {
+    sampleRate = sampleRate || 48000;
+    const beat = 60 / 90, gap = 2.2;
+    const total = 3 * gap + 8 * beat + 2.5;
+    const off = new OfflineAudioContext(2, Math.ceil(total * sampleRate), sampleRate);
+    const eng = createEngine(off);
+    eng.master.gain.value = masterGain === undefined ? 0.64 : masterGain; // 0.64 = default slider (80%)
+    const marks = {};
+    let t = 0.1;
+    ["G", "C", "D"].forEach(c => { marks[c] = t; eng.play(c, t); t += gap; });
+    marks.twinkle = t; eng.play("twinkle", t);
+    const buf = await off.startRendering();
+    return { sampleRate, marks, left: Array.from(buf.getChannelData(0)), right: Array.from(buf.getChannelData(1)) };
+  };
+})();
+</script>
+</body>
+</html>
