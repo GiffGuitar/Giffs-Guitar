@@ -7,7 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="v14.2">
+<meta name="app-version" content="v14.3">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Just One More Time Guitar Trainer</title>
 <meta name="apple-mobile-web-app-title" content="One More Time">
@@ -601,6 +601,14 @@
   .lg-root{background:#d7263d}.lg-scn{background:#1f7a74}.lg-blue{background:#2f6fd6}
   .lg-ext{border:2px dashed #1f7a74;width:10px;height:10px}
   #thScaleInfo .thnotes span.blue{border-color:#2f6fd6;background:#e8f0fd}
+  /* v14.3 pentatonic -> mode: the notes the mode adds (purple) over the pentatonic pattern (faint ghosts) */
+  #thFret .fbn.ghost circle{fill:#eef1ee;stroke:#b9c3bf;stroke-width:1.5}#thFret .fbn.ghost text{fill:#8a9590}
+  #thFret .fbn.ghost.root circle{fill:#f6d3d8;stroke:#e6a2ac}#thFret .fbn.ghost.root text{fill:#b0303f}
+  #thFret .fbn.ghost.gone circle{fill:#fffdf8;stroke:#c9b8b8;stroke-dasharray:3 3}#thFret .fbn.ghost.gone text{fill:#b7a9a9;text-decoration:line-through}
+  #thFret .fbn.add circle{fill:#7b3fc4;stroke:#1f2a37;stroke-width:2.5}#thFret .fbn.add text{fill:#fff}
+  .lg-add{background:#7b3fc4}.lg-ghost{background:#eef1ee;border:1.5px solid #b9c3bf;width:11px;height:11px}
+  .scdelta{margin:2px 2px 8px;padding:8px 12px;border-left:5px solid #7b3fc4;background:#f4eefb;border-radius:8px;font-size:16px;font-weight:600;color:var(--ink)}
+  .scdelta b{color:#5b2a9a}.scdelta[hidden]{display:none}
   #thOtherScales{gap:8px;align-items:center}
   #trGroups .trcard svg circle.tc-R{fill:#d7263d;stroke:#1f2a37;stroke-width:1.6}
   #trGroups .trcard svg circle.tc-3{fill:#1d63d8;stroke:#0d2f6b;stroke-width:1.4}
@@ -1034,10 +1042,12 @@
             <div class="scsw" id="thPatCtl">
               <label class="toggle" id="thExtWrap" title="Also show the neighbouring patterns below and above (dashed)"><input type="checkbox" id="thExt"><span class="sw-t"></span>Show extensions</label>
               <label class="toggle" id="thRelWrap" title="Same notes, but the relative minor is the root"><input type="checkbox" id="thRel"><span class="sw-t"></span><span id="thRelLbl">Relative minor</span></label>
+              <span class="seg" id="thModeView" hidden title="Show only what the mode adds to the pentatonic you were on, or the whole mode"><button type="button" data-mv="delta" class="on">Added notes</button><button type="button" data-mv="full">Full mode</button></span>
             </div>
           </div>
+          <div class="scdelta" id="thDelta" hidden></div>
           <div class="fbwrap" id="thFret"></div>
-          <div class="sclegend" id="thLegend"><span><i class="lg lg-root"></i>Root</span><span><i class="lg lg-scn"></i>Scale note</span><span id="thLgBlue"><i class="lg lg-blue"></i>Blue note</span><span id="thLgExt"><i class="lg lg-ext"></i>Extension</span></div>
+          <div class="sclegend" id="thLegend"><span><i class="lg lg-root"></i>Root</span><span><i class="lg lg-scn"></i>Scale note</span><span id="thLgBlue"><i class="lg lg-blue"></i>Blue note</span><span id="thLgExt"><i class="lg lg-ext"></i>Extension</span><span id="thLgAdd" hidden><i class="lg lg-add"></i>Added by the mode</span><span id="thLgGhost" hidden><i class="lg lg-ghost"></i>Pentatonic pattern</span></div>
           <p class="hint" id="thFretHint">Tap any note to hear it.</p>
         </div>
         <div class="thinfo">
@@ -4720,7 +4730,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // Part 11: THEORY  (scales, modes, chord shapes, circle of fifths; m8)
   // ==================================================================
   // v14.2: scale defaults to Major Pentatonic; ext = show neighbouring patterns, rel = relative minor as root, full = whole neck
-  const TH = { view: "chords", shapesView: "chords", scale: "majPent", labels: "notes", ext: false, rel: false, full: false, sched: null, raf: 0 };
+  const TH = { view: "chords", shapesView: "chords", scale: "majPent", labels: "notes", ext: false, rel: false, full: false, sched: null, raf: 0, penCtx: null, modeView: "delta" };   // v14.3: penCtx = pentatonic you came from
   const MODE_IDS = ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"];
   const MODE_LABEL = { ionian: "Ionian (Major)", aeolian: "Aeolian (Natural minor)" };
   const PATTERN_SCALES = ["majPent", "blues"];          // these show one pattern (box) instead of the whole neck
@@ -4829,6 +4839,35 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     return { minPc, rootPc, fE, lo: fE, hi: fE + 3, blues, dots: main.map(n => dot(n, false)).concat(ext.map(n => dot(n, true))) };
   }
   const NOTE_NAMES_FLAT_SAFE = pc => ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"][pc];
+  // ---- v14.3: pentatonic -> mode. Which notes does the mode add to the pentatonic you were just on? ----
+  // Compared by pitch from the shared root (the key). A pentatonic note the mode lacks pairs with an added note of the
+  // same degree number (♭3 -> 3) as a "change"; otherwise it is "not in the mode". Unpaired added notes are "adds".
+  const degNum = d => d.replace(/[♭♯b#]/g, "");
+  function modeDelta(key, parentId, modeId) {
+    const par = scaleFor(key, parentId), mo = scaleFor(key, modeId);
+    const ppcs = par.steps.map(s => (par.rootPc + s) % 12), mpcs = mo.steps.map(s => (mo.rootPc + s) % 12);
+    const added = [], missing = [];
+    mo.steps.forEach((s, i) => { if (ppcs.indexOf(mpcs[i]) < 0) added.push({ pc: mpcs[i], deg: mo.degrees[i], note: mo.notes[i] }); });
+    par.steps.forEach((s, i) => { if (mpcs.indexOf(ppcs[i]) < 0) missing.push({ pc: ppcs[i], deg: par.degrees[i], note: par.notes[i] }); });
+    const changes = [], adds = [], gone = [];
+    missing.forEach(m => { const a = added.find(x => !x.pair && degNum(x.deg) === degNum(m.deg)); if (a) { a.pair = m; changes.push({ from: m, to: a }); } else gone.push(m); });
+    added.forEach(a => { if (!a.pair) adds.push(a); });
+    return { par, mo, ppcs, mpcs, added, adds, changes, gone };
+  }
+  // dots for the delta view: the pentatonic pattern (or whole neck) as faint ghosts + the mode's added notes inside the same frets
+  function deltaDots(dl, ctx) {
+    const degOf = pc => { const i = dl.mpcs.indexOf(pc); if (i >= 0) return dl.mo.degrees[i]; const j = dl.ppcs.indexOf(pc); return dl.par.degrees[j]; };
+    const base = TH.full ? scaleDots(dl.par).map(d => ({ s: d.s, f: d.f, pc: d.midi % 12, label: d.label })) : scalePattern(dl.par, { ext: ctx.ext, rel: ctx.rel }).dots;
+    const fs = base.map(d => d.f), lo = TH.full ? 0 : Math.min.apply(null, fs), hi = TH.full ? FB.frets : Math.max.apply(null, fs);
+    const rootPc = dl.mo.rootPc, dots = [];
+    base.forEach(d => dots.push({ s: d.s, f: d.f, root: d.pc === rootPc, cls: "ghost" + (dl.mpcs.indexOf(d.pc) < 0 ? " gone" : ""),
+      label: TH.labels === "degrees" ? degOf(d.pc) : d.label }));
+    for (let st = 0; st < 6; st++) for (let f = lo; f <= hi; f++) {
+      const pc = (OPEN_STRINGS[st] + f) % 12, a = dl.added.find(x => x.pc === pc);
+      if (a) dots.push({ s: st, f, root: false, cls: "add", label: a.deg, data: `data-add="${a.deg}"` });
+    }
+    return { dots, lo, hi };
+  }
   function patternSVG(sc, p) {
     const lo = Math.min.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
     const hi = Math.max.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
@@ -4904,9 +4943,14 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     document.querySelectorAll("#thLabels button").forEach(b => b.classList.toggle("on", b.dataset.lbl === TH.labels));
     // One pattern for Major Pentatonic and Blues (unless "Whole neck" is on); the other scales keep the whole-neck drawing
     const pattern = PATTERN_SCALES.indexOf(id) >= 0 && !TH.full;
+    if (!isMode) TH.penCtx = null;                                       // v14.3: leaving the modes ends the pentatonic context
+    const delta = isMode && TH.penCtx && TH.modeView === "delta";
+    $("thModeView").hidden = !(isMode && TH.penCtx);
+    document.querySelectorAll("#thModeView button").forEach(b => b.classList.toggle("on", b.dataset.mv === TH.modeView));
     const rel = id === "majPent" && TH.rel;
     const p = pattern ? scalePattern(sc, { ext: TH.ext, rel }) : null;
-    $("thPatCtl").hidden = !pattern;
+    $("thPatCtl").hidden = !pattern && $("thModeView").hidden;
+    $("thExtWrap").hidden = !pattern;
     $("thRelWrap").hidden = id !== "majPent" || !pattern;
     $("thExt").checked = TH.ext; $("thRel").checked = TH.rel; $("thFull").checked = TH.full;
     const minName = pretty(spell(parseNote(sc.root).li + 5, (sc.rootPc + 9) % 12));
@@ -4932,6 +4976,22 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
       ? (TH.ext ? "Solid = pattern 1. Dashed = the neighbouring patterns below and above. " : `The "wall" is fret ${p.lo} on all six strings. `) + "Low E at the bottom. Tap any note to hear it."
       : `Frets 0 to ${FB.frets}, standard tuning, low E at the bottom. Red = the root. Tap any note to hear it.`;
     $("thFret").innerHTML = p ? patternSVG(sc, p) : fretboardSVG(sc);
+    $("thDelta").hidden = !delta; $("thLgAdd").hidden = $("thLgGhost").hidden = !delta; $("thLegend").querySelector(".lg-scn").parentNode.hidden = !!delta;
+    if (!delta) return;
+    // v14.3: only the notes this mode adds to the pentatonic you were on, in the same frets
+    const ctx = TH.penCtx, dl = modeDelta(currentKey, ctx.scale, id), dd = deltaDots(dl, ctx);
+    const pName = ctx.scale === "blues" ? "Blues" : "Major Pentatonic", nm = x => `${x.deg} (${pretty(x.note)})`;
+    const parts = [];
+    if (dl.adds.length) parts.push(`adds <b>${dl.adds.map(nm).join(", ")}</b>`);
+    if (dl.changes.length) parts.push(`changes <b>${dl.changes.map(c => `${c.from.deg} → ${nm(c.to)}`).join(", ")}</b>`);
+    if (dl.gone.length) parts.push(`not in the mode: ${dl.gone.map(nm).join(", ")}`);
+    if (!dl.added.length) parts.unshift("adds nothing new");
+    $("thDelta").innerHTML = dl.changes.length || dl.gone.length || !dl.added.length
+      ? `${sc.name} over ${pretty(dl.par.root)} ${pName}: ${parts.join(" · ")}` : `${sc.name} ${parts[0]} to ${pretty(dl.par.root)} ${pName}`;
+    $("thScaleTitle").innerHTML = `<h3>${title}</h3><span>Added to ${pretty(dl.par.root)} ${pName} · ${TH.full ? `Frets 0–${FB.frets}` : `Pattern 1 · frets ${dd.lo}–${dd.hi}`}</span>`;
+    $("thFretHint").textContent = "Purple = the notes the mode adds. Faint = the pentatonic you were on" + (dl.gone.length ? " (crossed out = not in the mode)" : "") + ". Tap any note to hear it.";
+    $("thFret").innerHTML = neckSVG({ dots: dd.dots, boxes: TH.full ? [] : [{ s0: 0, s1: 5, f0: dd.lo, f1: dd.hi }],
+      aria: `${pretty(sc.root)} ${sc.name}: the notes it adds to ${pretty(dl.par.root)} ${pName}` });
   }
   function renderShapes() {
     const root = currentKey;
@@ -5328,7 +5388,12 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   });
   $("thSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopTheory(); TH.view = TH.shapesView = b.dataset.view; renderTheory(); });
   $("thScalePick").addEventListener("click", e => { const b = e.target.closest("button[data-scale]"); if (!b) return; stopTheory(); TH.scale = b.dataset.scale; renderScales(); });
-  $("thScalePick").addEventListener("change", e => { if (e.target.id !== "thModeSel" || !e.target.value) return; stopTheory(); TH.scale = e.target.value; renderScales(); });
+  $("thScalePick").addEventListener("change", e => {
+    if (e.target.id !== "thModeSel" || !e.target.value) return; stopTheory();
+    if (PATTERN_SCALES.indexOf(TH.scale) >= 0) { TH.penCtx = { scale: TH.scale, key: currentKey, rel: TH.scale === "majPent" && TH.rel, ext: TH.ext }; TH.modeView = "delta"; }   // v14.3
+    TH.scale = e.target.value; renderScales();
+  });
+  $("thModeView").addEventListener("click", e => { const b = e.target.closest("button[data-mv]"); if (!b) return; TH.modeView = b.dataset.mv; renderScales(); });
   $("thOtherScales").addEventListener("click", e => { const b = e.target.closest("button[data-scale]"); if (!b) return; stopTheory(); TH.scale = b.dataset.scale; renderScales(); });
   $("thKeySel").addEventListener("change", e => { stopTheory(); if (KEYS.indexOf(e.target.value) >= 0) setKey(e.target.value); });
   $("thExt").addEventListener("change", e => { TH.ext = e.target.checked; renderScales(); });
@@ -5463,7 +5528,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // ==================================================================
   // The page asks the server for a fresh copy of itself (never from cache) when it opens and when it comes
   // back to the front. If the server has a newer version than the one running, a gold bar offers a reload.
-  const APP_VERSION = "v14.2";
+  const APP_VERSION = "v14.3";
   $("appVer").textContent = APP_VERSION;
   function checkForUpdate() {
     if (!/^https?:$/.test(location.protocol) || !window.fetch) return Promise.resolve(null);
@@ -5481,7 +5546,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   setTimeout(checkForUpdate, 1500);
 
   NashvilleEngine.coach = { findMixup, anchorSegments, anchorsFor, ANCHOR_LYRICS, lyricSyllables, DR, openDrill, closeDrill, drillStart, drillAnswer, drillNext, drillPlay, stopDrill, makeQuestion, boostedPool, LISTEN_LEVELS, DRILL_ROUNDS, renderDrill };
-  NashvilleEngine.theory = { TH, TR, TT, TUT_STEPS, FB, renderTheory, renderShapes, renderTriads, playScale, scaleMidis, scaleDots, stopTheory, playCof, fretboardSVG, triadDiagramSVG, numberIds, circleSVG, openTutorial, closeTutorial, tutGo, tutTurn };
+  NashvilleEngine.theory = { TH, TR, TT, TUT_STEPS, FB, modeDelta, renderTheory, renderShapes, renderTriads, playScale, scaleMidis, scaleDots, stopTheory, playCof, fretboardSVG, triadDiagramSVG, numberIds, circleSVG, openTutorial, closeTutorial, tutGo, tutTurn };
   NashvilleEngine.map = { MAP, mapShapes, checkMap, renderMap, mapPlay, stopMap };
   NashvilleEngine.cluster = { TC, TC_ROOTS, tcTriad, tcLayout, tcRender, tcPlay, tcStrum, checkCluster, mapSub, IP, ipVoicings, ipBest, ipRender, ipPlay, ipStrum, checkInPosition };
   NashvilleEngine.guide = { openGuide, closeGuide };
