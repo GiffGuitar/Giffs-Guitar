@@ -7,7 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="v14.1">
+<meta name="app-version" content="v14.2">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Just One More Time Guitar Trainer</title>
 <meta name="apple-mobile-web-app-title" content="One More Time">
@@ -562,6 +562,46 @@
   #thFret .fbn.root text{fill:#fff}
   #thFret .fbn.playing circle{fill:var(--teal);stroke:#9fd6cf;stroke-width:4}
   #thScaleInfo .thnotes span.root{border-color:#d7263d;background:#fdeaec}
+  /* v14.2 scales page: one control row, one pattern, colour key (root red, scale teal, blue notes blue, extensions dashed) */
+  .scrow{display:flex;align-items:flex-end;gap:10px 18px;flex-wrap:wrap;margin:2px 0 12px}
+  .scrow .drlbl{display:block;margin:0 0 4px 2px;font-size:12.5px}
+  .sckey select,.scbtns select{min-height:52px;padding:6px 12px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:800;font-size:17px;color:var(--ink);cursor:pointer}
+  .sckey select{min-width:76px}
+  .scbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+  .scbtn{min-height:52px;padding:6px 16px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:800;font-size:17px;color:var(--ink);cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+  .scbtn small{display:block;font-size:11.5px;font-weight:600;opacity:.8;margin-top:1px}
+  .scbtn.hi,.scbtns select.hi{background:#e8a33a;border-color:#d38b1f;color:#1f2a37}
+  @media (hover:hover){.scbtn:hover,.scbtns select:hover{border-color:var(--teal)}}
+  .scmore{margin-left:auto;display:flex;flex-wrap:wrap;align-items:flex-end}
+  .scmore .optrow{margin:0}
+  .scrow #optScale{flex-basis:100%;margin:0}
+  .scpanel{padding:12px 14px 8px}
+  .schead{display:flex;align-items:center;justify-content:space-between;gap:8px 18px;flex-wrap:wrap;margin-bottom:6px}
+  .sctitle h3{display:inline;margin:0 10px 0 0;font-size:24px}
+  .sctitle span{font-size:15px;color:var(--muted);font-weight:600}
+  .scsw{display:flex;gap:10px 18px;flex-wrap:wrap}
+  .scsw .toggle{min-height:40px;font-size:15px}
+  #thFret .fbn circle{fill:#1f7a74;stroke:#fff;stroke-width:2}
+  #thFret .fbn text{fill:#fff}
+  #thFret .fbn.blue circle{fill:#2f6fd6;stroke:#fff;stroke-width:2}
+  #thFret .fbn.root circle{fill:#d7263d;stroke:#fff;stroke-width:2}
+  #thFret .fbn.ext circle{fill:#fffdf8;stroke:#1f7a74;stroke-width:2.5;stroke-dasharray:5 3}
+  #thFret .fbn.ext text{fill:#1f7a74}
+  #thFret .fbn.ext.blue circle{stroke:#2f6fd6}#thFret .fbn.ext.blue text{fill:#2f6fd6}
+  #thFret .fbn.ext.root circle{stroke:#d7263d}#thFret .fbn.ext.root text{fill:#d7263d}
+  #thFret .fbn.playing circle{fill:var(--teal);stroke:#9fd6cf;stroke-width:4;stroke-dasharray:none}
+  #thFret .fbn.playing text{fill:#fff}
+  #thFret .nbox rect:not(.nhit){fill:rgba(232,163,58,.10);stroke:#e8a33a;stroke-width:2}
+  #thFret .nbox text{fill:#a8701c}
+  #thFret .nbox .nhit{fill:transparent}
+  .sclegend{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:15px;font-weight:700;color:var(--muted);margin:6px 2px 2px}
+  .sclegend span{display:inline-flex;align-items:center;gap:6px}
+  .sclegend [hidden]{display:none}
+  .lg{display:inline-block;width:14px;height:14px;border-radius:50%}
+  .lg-root{background:#d7263d}.lg-scn{background:#1f7a74}.lg-blue{background:#2f6fd6}
+  .lg-ext{border:2px dashed #1f7a74;width:10px;height:10px}
+  #thScaleInfo .thnotes span.blue{border-color:#2f6fd6;background:#e8f0fd}
+  #thOtherScales{gap:8px;align-items:center}
   #trGroups .trcard svg circle.tc-R{fill:#d7263d;stroke:#1f2a37;stroke-width:1.6}
   #trGroups .trcard svg circle.tc-3{fill:#1d63d8;stroke:#0d2f6b;stroke-width:1.4}
   #trGroups .trcard svg circle.tc-5{fill:#ffb000;stroke:#7a4a00;stroke-width:1.4;stroke-dasharray:3 2}
@@ -983,17 +1023,35 @@
         <span class="muted thkeyhint">Pick the key in the key bar above.</span>
       </div>
       <div id="thScales">
-        <div class="chiprow thpick" id="thScalePick"></div>
+        <div class="scrow" id="thScaleRow">
+          <label class="sckey"><span class="drlbl">Key</span><select id="thKeySel" aria-label="Key"></select></label>
+          <div class="scgrp" id="thScaleGrp"><span class="drlbl">Scale</span><div class="scbtns" id="thScalePick"></div></div>
+          <span class="scmore" id="thMoreAnchor"></span>
+        </div>
+        <div class="panel scpanel">
+          <div class="schead">
+            <div class="sctitle" id="thScaleTitle"></div>
+            <div class="scsw" id="thPatCtl">
+              <label class="toggle" id="thExtWrap" title="Also show the neighbouring patterns below and above (dashed)"><input type="checkbox" id="thExt"><span class="sw-t"></span>Show extensions</label>
+              <label class="toggle" id="thRelWrap" title="Same notes, but the relative minor is the root"><input type="checkbox" id="thRel"><span class="sw-t"></span><span id="thRelLbl">Relative minor</span></label>
+            </div>
+          </div>
+          <div class="fbwrap" id="thFret"></div>
+          <div class="sclegend" id="thLegend"><span><i class="lg lg-root"></i>Root</span><span><i class="lg lg-scn"></i>Scale note</span><span id="thLgBlue"><i class="lg lg-blue"></i>Blue note</span><span id="thLgExt"><i class="lg lg-ext"></i>Extension</span></div>
+          <p class="hint" id="thFretHint">Tap any note to hear it.</p>
+        </div>
         <div class="thinfo">
           <div id="thScaleInfo"></div>
           <div class="thctl">
             <button type="button" class="btn primary" id="thPlayScale">&#9654; Play up and down</button>
             <button type="button" class="btn stopbtn" id="thStop">&#9632; Stop</button>
-            <span class="seg" id="thLabels"><button type="button" data-lbl="notes" class="on">Note names</button><button type="button" data-lbl="degrees">Degrees</button></span>
           </div>
         </div>
-        <div class="panel fbpanel"><div class="fbwrap" id="thFret"></div>
-          <p class="hint">Frets 0 to 17, standard tuning, low E at the bottom. Red = the root. Tap any note to hear it.</p></div>
+        <div hidden id="thMoreItems">
+          <span class="seg" id="thLabels"><button type="button" data-lbl="notes" class="on">Note names</button><button type="button" data-lbl="degrees">Degrees</button></span>
+          <span class="chiprow thpick" id="thOtherScales"></span>
+          <label class="toggle" id="thFullWrap" title="Show the scale everywhere on frets 0 to 17 instead of one pattern"><input type="checkbox" id="thFull"><span class="sw-t"></span>Whole neck (all patterns)</label>
+        </div>
       </div>
             <div id="thTriads" data-mode="cards" hidden>
         <div class="thctl trctl">
@@ -1391,10 +1449,10 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
                   desc: "Darker and sadder: the scale behind most minor-key songs." },
     majPent:    { name: "Major pentatonic", steps: [0, 2, 4, 7, 9], deg: ["1", "2", "3", "5", "6"], let: [0, 1, 2, 4, 5],
                   desc: "Five notes with no clashes: sweet and open, used all over country, folk and rock melodies." },
-    minPent:    { name: "Minor pentatonic", steps: [0, 3, 5, 7, 10], deg: ["1", "♭3", "4", "5", "♭7"], let: [0, 2, 3, 4, 6],
-                  desc: "Five notes, the go-to for rock and blues solos; it's hard to hit a wrong note." },
-    blues:      { name: "Blues",            steps: [0, 3, 5, 6, 7, 10], deg: ["1", "♭3", "4", "♭5", "5", "♭7"], let: [0, 2, 3, 4, 4, 6],
-                  desc: "Minor pentatonic plus the ♭5 'blue note': gritty and bluesy, great over a 12-bar." },
+    // v14.2: Minor pentatonic and Blues are one option, "Blues": the minor pentatonic core (1 4 5 ♭7) plus the two
+    // blue notes, the ♭3 and the ♯4 (blue: indexes into steps). Old saves/calls that say "minPent" map to "blues".
+    blues:      { name: "Blues",            steps: [0, 3, 5, 6, 7, 10], deg: ["1", "♭3", "4", "♯4", "5", "♭7"], let: [0, 2, 3, 3, 4, 6], blue: [1, 3],
+                  desc: "The minor pentatonic with its two blue notes, the ♭3 and the ♯4: gritty and bluesy, the go-to for rock and blues solos and great over a 12-bar." },
     ionian:     { name: "Ionian",           steps: [0, 2, 4, 5, 7, 9, 11], deg: ["1", "2", "3", "4", "5", "6", "7"], mode: true,
                   desc: "Mode 1, the same notes as the major scale: bright and happy." },
     dorian:     { name: "Dorian",           steps: [0, 2, 3, 5, 7, 9, 10], deg: ["1", "2", "♭3", "4", "5", "6", "♭7"], mode: true,
@@ -1411,6 +1469,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
                   desc: "♭2 and ♭5: very tense and unsettled; rarely used for a whole song." }
   };
   const SCALE_IDS = Object.keys(SCALES);
+  const SCALE_ALIAS = { minPent: "blues", minorPentatonic: "blues" };       // v14.2: removed ids -> their new home
   const ENHARMONIC = { Db: "C#", "C#": "Db", Eb: "D#", "D#": "Eb", Gb: "F#", "F#": "Gb", Ab: "G#", "G#": "Ab", Bb: "A#", "A#": "Bb" };
   function spellOn(root, id) {                      // spell the scale from this exact root name, or null if it needs ♭♭/♯♯
     const sc = SCALES[id], r = parseNote(root);
@@ -1426,6 +1485,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // scaleFor("Db", "minor") -> { root:"C#", notes:[...], degrees, respelled:true }   uses the key's own name unless
   // the other spelling of the same note is simpler (fewer sharps/flats, never a double sharp or flat)
   function scaleFor(key, id) {
+    if (SCALE_ALIAS[id]) id = SCALE_ALIAS[id];
     if (!SCALES[id]) throw new Error("Unknown scale: " + id);
     const cands = [key].concat(ENHARMONIC[key] ? [ENHARMONIC[key]] : []);
     let best = null;
@@ -2151,7 +2211,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     KEYS, PROGRESSIONS, CADENCE, PROGRESSION_NUMBERS, OPEN_STRINGS,
     getKey, chordFor, selfTest, fretString,
     strumChord, playProgression, playCadence, stopAll, setVolume, warmKey, seventhFor, checkSevenths, boogieShapes, SWING,
-    SCALES, SCALE_IDS, scaleFor, CHORD_TYPES, CHORD_TYPE_IDS, shapeChord, checkShapes,
+    SCALES, SCALE_IDS, SCALE_ALIAS, scaleFor, CHORD_TYPES, CHORD_TYPE_IDS, shapeChord, checkShapes,
     CIRCLE, circleIndex, keySignature, openChordKey, capoOptions,
     TRIAD_SETS, triadShapes, checkTriads, CAGED_FORMS, cagedShapes, checkCaged,
     createEngine,                       // for offline rendering / tests
@@ -4659,7 +4719,11 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // ==================================================================
   // Part 11: THEORY  (scales, modes, chord shapes, circle of fifths; m8)
   // ==================================================================
-  const TH = { view: "chords", shapesView: "chords", scale: "major", labels: "notes", sched: null, raf: 0 };
+  // v14.2: scale defaults to Major Pentatonic; ext = show neighbouring patterns, rel = relative minor as root, full = whole neck
+  const TH = { view: "chords", shapesView: "chords", scale: "majPent", labels: "notes", ext: false, rel: false, full: false, sched: null, raf: 0 };
+  const MODE_IDS = ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"];
+  const MODE_LABEL = { ionian: "Ionian (Major)", aeolian: "Aeolian (Natural minor)" };
+  const PATTERN_SCALES = ["majPent", "blues"];          // these show one pattern (box) instead of the whole neck
   // The neck drawing (m9: frets 0-17, sized to fit the width of an iPad Mini in portrait)
   const FB = { x0: 72, dx: 52, y0: 26, dy: 36, frets: 17, r: 15.5 };
   const FRET_MARKS = [3, 5, 7, 9, 15, 17];                       // single dots; 12 gets two
@@ -4728,6 +4792,49 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   function fretboardSVG(sc) {
     return neckSVG({ dots: scaleDots(sc), aria: `${pretty(sc.root)} ${sc.name} on the fretboard, frets 0 to ${FB.frets}` });
   }
+  // ---- v14.2: pentatonic pattern view (Major Pentatonic and Blues) ----
+  // Pattern 1 = the box that starts on the minor root on the low E string (for C major pentatonic: A at fret 5, so
+  // frets 5-8 with the "wall" on fret 5). Each pattern is two notes per string, walking up the pentatonic in pitch
+  // order from its first note on the low E. The neighbour below starts one scale note lower, the one above one higher.
+  const DEG_BY_IV = { 0: "1", 2: "2", 3: "♭3", 4: "3", 5: "4", 6: "♯4", 7: "5", 9: "6", 10: "♭7" };
+  function scalePattern(sc, opts) {
+    const o = opts || {};
+    const blues = sc.id === "blues";
+    const minPc = blues ? sc.rootPc : (sc.rootPc + 9) % 12;            // minor root (A for C major pentatonic)
+    const rootPc = blues || o.rel ? minPc : sc.rootPc;                  // the red note
+    const pent = [0, 3, 5, 7, 10].map(x => (minPc + x) % 12);
+    const bluePcs = blues ? [(minPc + 3) % 12, (minPc + 6) % 12] : [];
+    const fE = ((minPc - OPEN_STRINGS[0]) % 12 + 12) % 12;              // fret of the minor root on the low E (0-11)
+    const seq = []; for (let m = OPEN_STRINGS[0] - 12; m < 100; m++) if (pent.indexOf(m % 12) >= 0) seq.push(m);
+    const box = start => { let i = seq.indexOf(start); const out = []; for (let st = 0; st < 6; st++) for (let k = 0; k < 2; k++) { const m = seq[i++]; out.push({ s: st, f: m - OPEN_STRINGS[st], midi: m }); } return out; };
+    const addBlue = notes => {                                           // Blues: the ♯4 inside the box's fret span
+      if (!blues) return notes;
+      const fs = notes.map(n => n.f), lo = Math.min.apply(null, fs), hi = Math.max.apply(null, fs), add = [];
+      for (let st = 0; st < 6; st++) for (let f = lo; f <= hi; f++) if ((OPEN_STRINGS[st] + f) % 12 === (minPc + 6) % 12) add.push({ s: st, f, midi: OPEN_STRINGS[st] + f });
+      return notes.concat(add);
+    };
+    const start = OPEN_STRINGS[0] + fE, i0 = seq.indexOf(start);
+    const inRange = n => n.f >= 0 && n.f <= FB.frets;
+    const main = addBlue(box(start)).filter(inRange);
+    const key = n => n.s + ":" + n.f, seen = {};
+    main.forEach(n => { seen[key(n)] = 1; });
+    let ext = [];
+    if (o.ext) [seq[i0 - 1], seq[i0 + 1]].forEach(st0 => addBlue(box(st0)).filter(inRange).forEach(n => { if (!seen[key(n)]) { seen[key(n)] = 1; ext.push(n); } }));
+    const nameOf = pc => { const i = sc.steps.findIndex(st => (sc.rootPc + st) % 12 === pc); return i >= 0 ? sc.notes[i] : NOTE_NAMES_FLAT_SAFE(pc); };
+    const dot = (n, isExt) => {
+      const pc = n.midi % 12, iv = ((pc - rootPc) % 12 + 12) % 12;
+      const cls = [isExt ? "ext" : "", bluePcs.indexOf(pc) >= 0 ? "blue" : ""].filter(Boolean).join(" ");
+      return { s: n.s, f: n.f, midi: n.midi, root: pc === rootPc, cls, label: TH.labels === "degrees" ? DEG_BY_IV[iv] : pretty(nameOf(pc)), pc };
+    };
+    return { minPc, rootPc, fE, lo: fE, hi: fE + 3, blues, dots: main.map(n => dot(n, false)).concat(ext.map(n => dot(n, true))) };
+  }
+  const NOTE_NAMES_FLAT_SAFE = pc => ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"][pc];
+  function patternSVG(sc, p) {
+    const lo = Math.min.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
+    const hi = Math.max.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
+    return neckSVG({ dots: p.dots, boxes: [{ s0: 0, s1: 5, f0: lo, f1: hi }],
+      aria: `${pretty(sc.root)} ${sc.name}, pattern 1, frets ${lo} to ${hi}${TH.ext ? ", with the neighbouring patterns" : ""}` });
+  }
   // Single picked notes through the unchanged engine (the same pick tone as the song melodies)
   function playNotes(list, gap, audio, startTime) {
     const a = audio || liveAudio();
@@ -4765,7 +4872,8 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   }
   function playScale() {
     stopAll3();
-    const sc = scaleFor(currentKey, TH.scale);
+    let sc = scaleFor(currentKey, TH.scale);
+    if (TH.scale === "majPent" && TH.rel) sc = { rootPc: (sc.rootPc + 9) % 12, steps: [0, 3, 5, 7, 10] };   // v14.2: relative minor plays from its own root
     const sched = playNotes(scaleMidis(sc).map(m => melodyFrets(m)), 0.34);
     TH.sched = sched;
     $("thPlayScale").classList.add("on");
@@ -4781,16 +4889,49 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     if (TH.view === "scales") renderScales(); else if (TH.view === "triads") renderTriads(); else if (TH.view === "chords") { renderShapes(); renderCaged(); } else renderCircle();
   }
   function renderScales() {
-    const sc = scaleFor(currentKey, TH.scale);
-    const chip = id => `<button type="button" class="chip${id === TH.scale ? " hi" : ""}" data-scale="${id}">${SCALES[id].name}</button>`;
-    $("thScalePick").innerHTML = `<span class="drlbl">Scales</span>` + SCALE_IDS.filter(id => !SCALES[id].mode).map(chip).join("") +
-      `<span class="drlbl">Modes</span>` + SCALE_IDS.filter(id => SCALES[id].mode).map(chip).join("");
-    const title = SCALES[TH.scale].mode ? sc.name : TH.scale === "blues" ? "blues scale" : sc.name.toLowerCase();
-    $("thScaleInfo").innerHTML = `<h3>${pretty(sc.root)} ${title}</h3><div class="thnotes">${sc.notes.map((n, i) => `<span${i === 0 ? ' class="root"' : ""}><b>${pretty(n)}</b><small>${sc.degrees[i]}</small></span>`).join("")}</div>` +
-      `<p class="thdesc">${sc.desc}</p>` +
-      (sc.respelled ? `<p class="hint">Shown as ${pretty(sc.root)} (same notes as ${pretty(currentKey)}): that spelling needs fewer sharps and flats.</p>` : "");
+    if (SCALE_ALIAS[TH.scale]) TH.scale = SCALE_ALIAS[TH.scale];
+    if (!SCALES[TH.scale]) TH.scale = "majPent";
+    const sc = scaleFor(currentKey, TH.scale), id = TH.scale, isMode = !!SCALES[id].mode;
+    // Key (shared with the key bar) + Scale: Major · Major Pentatonic (cowboy) · Blues · Modes dropdown
+    const ks = $("thKeySel");
+    if (ks.options.length !== KEYS.length) ks.innerHTML = KEYS.map(k => `<option value="${k}">${pretty(k)}</option>`).join("");
+    ks.value = currentKey;
+    const btn = (sid, label, small) => `<button type="button" class="scbtn${sid === id ? " hi" : ""}" data-scale="${sid}" aria-pressed="${sid === id}">${label}${small ? `<small>${small}</small>` : ""}</button>`;
+    $("thScalePick").innerHTML = btn("major", "Major") + btn("majPent", "Major Pentatonic", "(cowboy)") + btn("blues", "Blues") +
+      `<select id="thModeSel" class="${isMode ? "hi" : ""}" aria-label="Modes"><option value=""${isMode ? "" : " selected"}>Modes</option>` +
+      MODE_IDS.map(m => `<option value="${m}"${m === id ? " selected" : ""}>${MODE_LABEL[m] || SCALES[m].name}</option>`).join("") + `</select>`;
+    $("thOtherScales").innerHTML = `<span class="ctlbl">Other scale:</span><button type="button" class="chip${id === "minor" ? " hi" : ""}" data-scale="minor">${SCALES.minor.name}</button>`;
     document.querySelectorAll("#thLabels button").forEach(b => b.classList.toggle("on", b.dataset.lbl === TH.labels));
-    $("thFret").innerHTML = fretboardSVG(sc);
+    // One pattern for Major Pentatonic and Blues (unless "Whole neck" is on); the other scales keep the whole-neck drawing
+    const pattern = PATTERN_SCALES.indexOf(id) >= 0 && !TH.full;
+    const rel = id === "majPent" && TH.rel;
+    const p = pattern ? scalePattern(sc, { ext: TH.ext, rel }) : null;
+    $("thPatCtl").hidden = !pattern;
+    $("thRelWrap").hidden = id !== "majPent" || !pattern;
+    $("thExt").checked = TH.ext; $("thRel").checked = TH.rel; $("thFull").checked = TH.full;
+    const minName = pretty(spell(parseNote(sc.root).li + 5, (sc.rootPc + 9) % 12));
+    $("thRelLbl").textContent = "Relative minor: " + minName;
+    // the note list, starting from the red root
+    let notes = sc.notes.map((n, i) => ({ n, d: sc.degrees[i], blue: !!(SCALES[id].blue && SCALES[id].blue.indexOf(i) >= 0) }));
+    if (rel) { const rot = notes.slice(4).concat(notes.slice(0, 4)); notes = rot.map((x, i) => ({ n: x.n, d: ["1", "♭3", "4", "5", "♭7"][i], blue: false })); }
+    const rootName = rel ? notes[0].n : sc.root;
+    let title, sub;
+    if (rel) { title = `${pretty(rootName)} minor pentatonic`; sub = `Relative minor of ${pretty(sc.root)} major pentatonic · same notes`; }
+    else if (id === "blues") { title = `${pretty(sc.root)} Blues`; sub = `Blue notes: ♭3 ${pretty(sc.notes[1])} and ♯4 ${pretty(sc.notes[3])}`; }
+    else if (isMode) { title = `${pretty(sc.root)} ${sc.name}`; sub = "Mode"; }
+    else { title = `${pretty(sc.root)} ${sc.name.replace("pentatonic", "Pentatonic")}`; sub = ""; }
+    if (p) sub = (sub ? sub + " · " : "") + `Pattern 1 · frets ${p.lo}–${p.hi}` + (rel || id === "blues" ? "" : " · " + notes.map(x => pretty(x.n)).join(" "));
+    else sub = (sub ? sub + " · " : "") + `Frets 0–${FB.frets}`;
+    $("thScaleTitle").innerHTML = `<h3>${title}</h3><span>${sub}</span>`;
+    $("thScaleInfo").innerHTML = `<div class="thnotes">${notes.map((x, i) => `<span class="${i === 0 ? "root" : x.blue ? "blue" : ""}"><b>${pretty(x.n)}</b><small>${x.d}</small></span>`).join("")}</div>` +
+      `<p class="thdesc">${rel ? `${pretty(rootName)} minor pentatonic uses exactly the same five notes as ${pretty(sc.root)} major pentatonic; only the home note (red) moves.` : sc.desc}</p>` +
+      (sc.respelled ? `<p class="hint">Shown as ${pretty(sc.root)} (same notes as ${pretty(currentKey)}): that spelling needs fewer sharps and flats.</p>` : "");
+    $("thLgBlue").hidden = id !== "blues";
+    $("thLgExt").hidden = !(p && TH.ext);
+    $("thFretHint").textContent = p
+      ? (TH.ext ? "Solid = pattern 1. Dashed = the neighbouring patterns below and above. " : `The "wall" is fret ${p.lo} on all six strings. `) + "Low E at the bottom. Tap any note to hear it."
+      : `Frets 0 to ${FB.frets}, standard tuning, low E at the bottom. Red = the root. Tap any note to hear it.`;
+    $("thFret").innerHTML = p ? patternSVG(sc, p) : fretboardSVG(sc);
   }
   function renderShapes() {
     const root = currentKey;
@@ -5187,6 +5328,12 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   });
   $("thSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stopTheory(); TH.view = TH.shapesView = b.dataset.view; renderTheory(); });
   $("thScalePick").addEventListener("click", e => { const b = e.target.closest("button[data-scale]"); if (!b) return; stopTheory(); TH.scale = b.dataset.scale; renderScales(); });
+  $("thScalePick").addEventListener("change", e => { if (e.target.id !== "thModeSel" || !e.target.value) return; stopTheory(); TH.scale = e.target.value; renderScales(); });
+  $("thOtherScales").addEventListener("click", e => { const b = e.target.closest("button[data-scale]"); if (!b) return; stopTheory(); TH.scale = b.dataset.scale; renderScales(); });
+  $("thKeySel").addEventListener("change", e => { stopTheory(); if (KEYS.indexOf(e.target.value) >= 0) setKey(e.target.value); });
+  $("thExt").addEventListener("change", e => { TH.ext = e.target.checked; renderScales(); });
+  $("thRel").addEventListener("change", e => { stopTheory(); TH.rel = e.target.checked; renderScales(); });
+  $("thFull").addEventListener("change", e => { TH.full = e.target.checked; renderScales(); });
   $("thLabels").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; TH.labels = b.dataset.lbl; renderScales(); });
   $("thPlayScale").addEventListener("click", playScale);
   $("thStop").addEventListener("click", stopTheory);
@@ -5316,7 +5463,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // ==================================================================
   // The page asks the server for a fresh copy of itself (never from cache) when it opens and when it comes
   // back to the front. If the server has a newer version than the one running, a gold bar offers a reload.
-  const APP_VERSION = "v14.1";
+  const APP_VERSION = "v14.2";
   $("appVer").textContent = APP_VERSION;
   function checkForUpdate() {
     if (!/^https?:$/.test(location.protocol) || !window.fetch) return Promise.resolve(null);
@@ -5385,7 +5532,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   function prefsSnapshot() {
     const o = { v: 1, sub: PREFS.sub, key: currentKey, area: NAV.area, inputs: {}, checks: {},
       tr: { q: TR.q, set: TR.set, tap: TR.tap, orient: TR.orient, num: TR.num }, cg: { q: CG.q, set: CG.set, view: CG.view },
-      th: { scale: TH.scale, labels: TH.labels }, map: { pos: MAP.pos, seven: MAP.seven, sub: TC.sub }, level: LS.level, cy: { bpm: CY.bpm } };
+      th: { scale: TH.scale, labels: TH.labels, ext: TH.ext, rel: TH.rel, full: TH.full, v: 2 }, map: { pos: MAP.pos, seven: MAP.seven, sub: TC.sub }, level: LS.level, cy: { bpm: CY.bpm } };
     PREF_INPUTS.forEach(id => { if ($(id)) o.inputs[id] = $(id).value; });
     PREF_CHECKS.forEach(id => { if ($(id)) o.checks[id] = $(id).checked; });
     return o;
@@ -5397,7 +5544,12 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     if (p.tr) { TR.q = pick(p.tr.q, ["major", "minor", "both"], TR.q); TR.set = pick(p.tr.set, Object.keys(TRIAD_SETS), TR.set); TR.tap = pick(p.tr.tap, ["chord", "note"], TR.tap);
       TR.orient = pick(p.tr.orient, ["land", "port"], TR.orient); TR.num = pick(p.tr.num, [1, 4, 5], TR.num); }
     if (p.cg) { CG.q = pick(p.cg.q, ["major", "minor"], CG.q); CG.set = pick(p.cg.set, Object.keys(TRIAD_SETS), CG.set); CG.view = pick(p.cg.view, ["step", "all"], CG.view); }
-    if (p.th) { TH.scale = pick(p.th.scale, SCALE_IDS, TH.scale); TH.labels = pick(p.th.labels, ["notes", "degrees"], TH.labels); }
+    if (p.th) {
+      const s = SCALE_ALIAS[p.th.scale] || p.th.scale;                   // v14.2: a saved "minPent" becomes "blues"
+      TH.scale = p.th.v === 2 ? pick(s, SCALE_IDS, TH.scale) : (s === "blues" ? "blues" : TH.scale);   // older saves start on Major Pentatonic once
+      TH.labels = pick(p.th.labels, ["notes", "degrees"], TH.labels);
+      if (p.th.v === 2) { TH.ext = p.th.ext === true; TH.rel = p.th.rel === true; TH.full = p.th.full === true; }
+    }
     if (p.map) { MAP.pos = pick(p.map.pos, [1, 2], MAP.pos); MAP.seven = pick(p.map.seven, ["m7b5", "dim"], MAP.seven); }
     if (p.level >= 1 && p.level <= 3) LS.level = p.level;
     if (p.cy && p.cy.bpm >= CY.MIN && p.cy.bpm <= CY.MAX && p.cy.bpm % CY.STEP === 0) CY.bpm = p.cy.bpm;
@@ -5412,13 +5564,13 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // ---- Options (a small button that opens the less-used choices; closed by default) ----
   function setOpt(box, open) {
     box.hidden = !open;
-    document.querySelectorAll(`.optbtn[data-opt="${box.id}"]`).forEach(b => { b.setAttribute("aria-expanded", open ? "true" : "false"); b.textContent = open ? "Options ▴" : "Options ▾"; });
+    document.querySelectorAll(`.optbtn[data-opt="${box.id}"]`).forEach(b => { b.setAttribute("aria-expanded", open ? "true" : "false"); b.textContent = (b.dataset.lbl || "Options") + (open ? " ▴" : " ▾"); });
   }
   function closeOptions() { document.querySelectorAll(".optbox").forEach(b => setOpt(b, false)); }
-  function mkOptions(id, anchor, where, items, sum) {
+  function mkOptions(id, anchor, where, items, sum, label) {
     const a = typeof anchor === "string" ? document.querySelector(anchor) : anchor; if (!a) return null;
     const row = document.createElement("div"); row.className = "optrow";
-    row.innerHTML = `<button type="button" class="optbtn" data-opt="${id}" aria-expanded="false" aria-controls="${id}">Options ▾</button><span class="optsum" id="sum_${id}"></span>`;
+    row.innerHTML = `<button type="button" class="optbtn" data-opt="${id}"${label ? ` data-lbl="${label}"` : ""} aria-expanded="false" aria-controls="${id}">${label || "Options"} ▾</button><span class="optsum" id="sum_${id}"></span>`;
     const box = document.createElement("div"); box.className = "optbox"; box.id = id; box.hidden = true;
     items.forEach(it => {
       const el = typeof it.el === "string" ? ($(it.el) || document.querySelector(it.el)) : it.el; if (!el) return;
@@ -5445,7 +5597,9 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     $("lnLevelNote").style.display = "";
     mkOptions("optFT", "#ftHear .ctrls", "afterend", [{ label: "Play:", el: "ftPart" }, { el: "ftNums", closest: "label" }]);
     mkOptions("optTri", "#thTriads .trctl", "afterend", [{ label: "Tap plays:", el: "trTap" }]);
-    mkOptions("optScale", "#thScales .thctl", "afterend", [{ label: "Show:", el: "thLabels" }]);
+    // v14.2: the scales page keeps one control row; the less-used choices sit behind "More options" at its right end
+    const sbox = mkOptions("optScale", "#thMoreAnchor", "afterbegin", [{ label: "Show:", el: "thLabels" }, { el: "thOtherScales" }, { el: "thFullWrap" }], null, "More options");
+    if (sbox) $("thScaleRow").appendChild(sbox);
     // Chords (CAGED): Major/Minor + view stay; the string set goes behind Options
     const cq = $("cgQ"); cq.insertAdjacentHTML("beforebegin", '<span class="ctlbl">Show:</span>'); $("cgView").insertAdjacentHTML("beforebegin", '<span class="ctlbl">View:</span>');
     mkOptions("optCaged", "#thCaged .trctl", "afterend", [{ label: "Triads on:", el: "cgSet" }]);
