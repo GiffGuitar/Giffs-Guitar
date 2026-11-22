@@ -7,7 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="v14.3">
+<meta name="app-version" content="v14.5">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Just One More Time Guitar Trainer</title>
 <meta name="apple-mobile-web-app-title" content="One More Time">
@@ -579,8 +579,18 @@
   .schead{display:flex;align-items:center;justify-content:space-between;gap:8px 18px;flex-wrap:wrap;margin-bottom:6px}
   .sctitle h3{display:inline;margin:0 10px 0 0;font-size:24px}
   .sctitle span{font-size:15px;color:var(--muted);font-weight:600}
-  .scsw{display:flex;gap:10px 18px;flex-wrap:wrap}
+  .scsw{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center}
   .scsw .toggle{min-height:40px;font-size:15px}
+  /* v14.4: Up the neck toggle (orange pressed state with a check, gray when it does not fit) */
+  .upctl{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .upnew{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a8f96}
+  .upbtn{appearance:none;border:2px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-weight:800;font-size:16px;min-height:40px;padding:6px 16px;border-radius:12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .upbtn.on{background:#e8a33a;border-color:#d38b1f;color:#1f2a37;box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 2px 0 #c4841c}
+  .upbtn.on::before{content:"✓"}
+  .upbtn:disabled,.upbtn.disabled{background:#eeeae2;border-color:#d4cfc4;color:#8a8f96;box-shadow:none;cursor:default;font-weight:700}
+  .upbtn:disabled::before,.upbtn.disabled::before{content:none}
+  .upnote{font-size:14px;font-weight:600;color:var(--muted)}
+  @media (hover:hover){.upbtn:hover:not(:disabled):not(.disabled){border-color:var(--teal)}}
   #thFret .fbn circle{fill:#1f7a74;stroke:#fff;stroke-width:2}
   #thFret .fbn text{fill:#fff}
   #thFret .fbn.blue circle{fill:#2f6fd6;stroke:#fff;stroke-width:2}
@@ -1043,6 +1053,7 @@
               <label class="toggle" id="thExtWrap" title="Also show the neighbouring patterns below and above (dashed)"><input type="checkbox" id="thExt"><span class="sw-t"></span>Show extensions</label>
               <label class="toggle" id="thRelWrap" title="Same notes, but the relative minor is the root"><input type="checkbox" id="thRel"><span class="sw-t"></span><span id="thRelLbl">Relative minor</span></label>
               <span class="seg" id="thModeView" hidden title="Show only what the mode adds to the pentatonic you were on, or the whole mode"><button type="button" data-mv="delta" class="on">Added notes</button><button type="button" data-mv="full">Full mode</button></span>
+              <span class="upctl" id="thUpWrap" hidden><span class="upnew">NEW CONTROL</span><button type="button" id="thUpNeck" class="upbtn" aria-pressed="false">Up the neck</button><span class="upnote" id="thUpNote" hidden></span></span>
             </div>
           </div>
           <div class="scdelta" id="thDelta" hidden></div>
@@ -4730,7 +4741,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // Part 11: THEORY  (scales, modes, chord shapes, circle of fifths; m8)
   // ==================================================================
   // v14.2: scale defaults to Major Pentatonic; ext = show neighbouring patterns, rel = relative minor as root, full = whole neck
-  const TH = { view: "chords", shapesView: "chords", scale: "majPent", labels: "notes", ext: false, rel: false, full: false, sched: null, raf: 0, penCtx: null, modeView: "delta" };   // v14.3: penCtx = pentatonic you came from
+  const TH = { view: "chords", shapesView: "chords", scale: "majPent", labels: "notes", ext: false, rel: false, full: false, upNeck: false, sched: null, raf: 0, penCtx: null, modeView: "delta" };   // v14.3: penCtx = pentatonic you came from; v14.4: upNeck
   const MODE_IDS = ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"];
   const MODE_LABEL = { ionian: "Ionian (Major)", aeolian: "Aeolian (Natural minor)" };
   const PATTERN_SCALES = ["majPent", "blues"];          // these show one pattern (box) instead of the whole neck
@@ -4768,14 +4779,16 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     return s + `</svg>`;
   }
   function neckSVG(o) {
-    const W = FB.x0 + FB.frets * FB.dx + 12, H = FB.y0 + 5 * FB.dy + 40, mid = FB.y0 + 2.5 * FB.dy;
+    const nFrets = o.frets != null ? o.frets : FB.frets;
+    const W = FB.x0 + nFrets * FB.dx + 12, H = FB.y0 + 5 * FB.dy + 40, mid = FB.y0 + 2.5 * FB.dy;
     let s = `<svg viewBox="0 0 ${W} ${H}" class="fbsvg" role="img" aria-label="${o.aria || "fretboard"}" font-family="Inter,'Noto Sans',Lato,system-ui,sans-serif">`;
-    FRET_MARKS.forEach(f => { s += `<circle cx="${fbX(f)}" cy="${mid}" r="7" fill="#e9e1d1"/>`; });
-    s += `<circle cx="${fbX(12)}" cy="${FB.y0 + 1.5 * FB.dy}" r="7" fill="#e9e1d1"/><circle cx="${fbX(12)}" cy="${FB.y0 + 3.5 * FB.dy}" r="7" fill="#e9e1d1"/>`;
-    for (let f = 0; f <= FB.frets; f++) s += `<line x1="${FB.x0 + f * FB.dx}" x2="${FB.x0 + f * FB.dx}" y1="${FB.y0}" y2="${FB.y0 + 5 * FB.dy}" stroke="${f === 0 ? "#1f2a37" : "#a79f90"}" stroke-width="${f === 0 ? 6 : 2}"/>`;
-    for (let st = 0; st < 6; st++) s += `<line x1="${FB.x0 - 54}" x2="${FB.x0 + FB.frets * FB.dx}" y1="${fbY(st)}" y2="${fbY(st)}" stroke="#5b554b" stroke-width="${1 + (5 - st) * 0.3}"/>`;
+    FRET_MARKS.concat(nFrets >= 21 ? [21] : []).forEach(f => { if (f <= nFrets) s += `<circle cx="${fbX(f)}" cy="${mid}" r="7" fill="#e9e1d1"/>`; });
+    if (nFrets >= 12) s += `<circle cx="${fbX(12)}" cy="${FB.y0 + 1.5 * FB.dy}" r="7" fill="#e9e1d1"/><circle cx="${fbX(12)}" cy="${FB.y0 + 3.5 * FB.dy}" r="7" fill="#e9e1d1"/>`;
+    for (let f = 0; f <= nFrets; f++) s += `<line x1="${FB.x0 + f * FB.dx}" x2="${FB.x0 + f * FB.dx}" y1="${FB.y0}" y2="${FB.y0 + 5 * FB.dy}" stroke="${f === 0 ? "#1f2a37" : "#a79f90"}" stroke-width="${f === 0 ? 6 : 2}"/>`;
+    for (let st = 0; st < 6; st++) s += `<line x1="${FB.x0 - 54}" x2="${FB.x0 + nFrets * FB.dx}" y1="${fbY(st)}" y2="${fbY(st)}" stroke="#5b554b" stroke-width="${1 + (5 - st) * 0.3}"/>`;
     ["E", "A", "D", "G", "B", "e"].forEach((n, st) => { s += `<text x="2" y="${fbY(st) + 5}" font-size="14" font-weight="700" fill="#5d6b7a">${n}</text>`; });
-    [0, 3, 5, 7, 9, 12, 15, 17].forEach(f => { s += `<text x="${fbX(f)}" y="${H - 8}" font-size="15" font-weight="700" text-anchor="middle" fill="#5d6b7a">${f}</text>`; });
+    const fretNums = [0, 3, 5, 7, 9, 12, 15, 17, 18, 20, 21, 22, 23, 24];
+    fretNums.filter(f => f <= nFrets).forEach(f => { s += `<text x="${fbX(f)}" y="${H - 8}" font-size="15" font-weight="700" text-anchor="middle" fill="#5d6b7a">${f}</text>`; });
     (o.boxes || []).forEach(b => {
       const x0 = (b.f0 === 0 ? fbX(0) : fbX(b.f0)) - FB.dx / 2 + 4, x1 = fbX(b.f1) + FB.dx / 2 - 4, y0 = fbY(b.s1) - FB.dy / 2 + 2, y1 = fbY(b.s0) + FB.dy / 2 - 2;
       const hw = Math.max(x1 - x0, 70), hx = (x0 + x1) / 2 - hw / 2, hy0 = Math.min(y0, fbY(b.s1) - FB.dy / 2 - 6), hy1 = Math.max(y1, fbY(b.s0) + FB.dy / 2 + 6);
@@ -4815,6 +4828,8 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     const pent = [0, 3, 5, 7, 10].map(x => (minPc + x) % 12);
     const bluePcs = blues ? [(minPc + 3) % 12, (minPc + 6) % 12] : [];
     const fE = ((minPc - OPEN_STRINGS[0]) % 12 + 12) % 12;              // fret of the minor root on the low E (0-11)
+    const fStart = o.startFret != null ? o.startFret : fE;              // v14.4: Up the neck can start an octave higher
+    const maxF = o.maxFret != null ? o.maxFret : FB.frets;
     const seq = []; for (let m = OPEN_STRINGS[0] - 12; m < 100; m++) if (pent.indexOf(m % 12) >= 0) seq.push(m);
     const box = start => { let i = seq.indexOf(start); const out = []; for (let st = 0; st < 6; st++) for (let k = 0; k < 2; k++) { const m = seq[i++]; out.push({ s: st, f: m - OPEN_STRINGS[st], midi: m }); } return out; };
     const addBlue = notes => {                                           // Blues: the ♯4 inside the box's fret span
@@ -4823,8 +4838,8 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
       for (let st = 0; st < 6; st++) for (let f = lo; f <= hi; f++) if ((OPEN_STRINGS[st] + f) % 12 === (minPc + 6) % 12) add.push({ s: st, f, midi: OPEN_STRINGS[st] + f });
       return notes.concat(add);
     };
-    const start = OPEN_STRINGS[0] + fE, i0 = seq.indexOf(start);
-    const inRange = n => n.f >= 0 && n.f <= FB.frets;
+    const start = OPEN_STRINGS[0] + fStart, i0 = seq.indexOf(start);
+    const inRange = n => n.f >= 0 && n.f <= maxF;
     const main = addBlue(box(start)).filter(inRange);
     const key = n => n.s + ":" + n.f, seen = {};
     main.forEach(n => { seen[key(n)] = 1; });
@@ -4836,7 +4851,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
       const cls = [isExt ? "ext" : "", bluePcs.indexOf(pc) >= 0 ? "blue" : ""].filter(Boolean).join(" ");
       return { s: n.s, f: n.f, midi: n.midi, root: pc === rootPc, cls, label: TH.labels === "degrees" ? DEG_BY_IV[iv] : pretty(nameOf(pc)), pc };
     };
-    return { minPc, rootPc, fE, lo: fE, hi: fE + 3, blues, dots: main.map(n => dot(n, false)).concat(ext.map(n => dot(n, true))) };
+    return { minPc, rootPc, fE, lo: fStart, hi: fStart + 3, blues, dots: main.map(n => dot(n, false)).concat(ext.map(n => dot(n, true))) };
   }
   const NOTE_NAMES_FLAT_SAFE = pc => ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"][pc];
   // ---- v14.3: pentatonic -> mode. Which notes does the mode add to the pentatonic you were just on? ----
@@ -4868,10 +4883,28 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     }
     return { dots, lo, hi };
   }
+  // v14.5: Up the neck on a 24-fret neck (higher box must end at or below fret 24).
+  // Blues: the index-on-6th-root box an octave up (normal box + 12).
+  //   E 12-15; F 13-16; F#/Gb 14-17; G 15-18; Ab 16-19; A 17-20; Bb 18-21; B 19-22; C 20-23; Db 21-24.
+  //   D 22-25 and Eb 23-26 do not fit (disabled, with the existing note).
+  // Major pentatonic: pinky-on-octave-root box (6th-string root at the lower root + 12) — how E (9-12)
+  //   and G (12-15) are done. Enabled for every key, including C 17-20 and D 19-22.
+  const UP_NECK_MAX = 24;
+  function upNeckPos(key, scaleId) {
+    if (scaleId !== "blues" && scaleId !== "majPent") return null;
+    const sc = scaleFor(key, scaleId), pc = sc.rootPc;
+    if (scaleId === "blues") {
+      const fE = ((pc - OPEN_STRINGS[0]) % 12 + 12) % 12, lo = fE + 12, hi = lo + 3;
+      return hi <= UP_NECK_MAX ? { lo, hi, startFret: lo } : null;
+    }
+    const rootF = ((pc - OPEN_STRINGS[0]) % 12 + 12) % 12, pinky = rootF + 12, lo = pinky - 3, hi = pinky;
+    return hi <= UP_NECK_MAX ? { lo, hi, startFret: lo } : null;
+  }
   function patternSVG(sc, p) {
     const lo = Math.min.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
     const hi = Math.max.apply(null, p.dots.filter(d => !d.cls || d.cls.indexOf("ext") < 0).map(d => d.f));
-    return neckSVG({ dots: p.dots, boxes: [{ s0: 0, s1: 5, f0: lo, f1: hi }],
+    const nFrets = Math.max(FB.frets, Math.min(UP_NECK_MAX, hi + 2));
+    return neckSVG({ dots: p.dots, boxes: [{ s0: 0, s1: 5, f0: lo, f1: hi }], frets: nFrets,
       aria: `${pretty(sc.root)} ${sc.name}, pattern 1, frets ${lo} to ${hi}${TH.ext ? ", with the neighbouring patterns" : ""}` });
   }
   // Single picked notes through the unchanged engine (the same pick tone as the song melodies)
@@ -4948,7 +4981,21 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     $("thModeView").hidden = !(isMode && TH.penCtx);
     document.querySelectorAll("#thModeView button").forEach(b => b.classList.toggle("on", b.dataset.mv === TH.modeView));
     const rel = id === "majPent" && TH.rel;
-    const p = pattern ? scalePattern(sc, { ext: TH.ext, rel }) : null;
+    // v14.4: Up the neck — visible on Blues and Major Pentatonic pattern view; disabled when no higher box fits
+    const up = (id === "blues" || id === "majPent") && !TH.full ? upNeckPos(currentKey, id) : null;
+    if (!up) TH.upNeck = false;
+    const upWrap = $("thUpWrap"), upBtn = $("thUpNeck"), upNote = $("thUpNote");
+    if (upWrap) {
+      const showUp = (id === "blues" || id === "majPent") && !TH.full;
+      upWrap.hidden = !showUp;
+      upBtn.disabled = !up;
+      upBtn.classList.toggle("disabled", !up);
+      upBtn.classList.toggle("on", !!(up && TH.upNeck));
+      upBtn.setAttribute("aria-pressed", up && TH.upNeck ? "true" : "false");
+      if (showUp && !up) { upNote.hidden = false; upNote.textContent = "No higher position fits for " + pretty(sc.root) + "."; }
+      else { upNote.hidden = true; upNote.textContent = ""; }
+    }
+    const p = pattern ? scalePattern(sc, { ext: TH.ext, rel, startFret: (up && TH.upNeck) ? up.startFret : undefined, maxFret: (up && TH.upNeck) ? Math.max(FB.frets, up.hi, UP_NECK_MAX) : undefined }) : null;
     $("thPatCtl").hidden = !pattern && $("thModeView").hidden;
     $("thExtWrap").hidden = !pattern;
     $("thRelWrap").hidden = id !== "majPent" || !pattern;
@@ -4964,7 +5011,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
     else if (id === "blues") { title = `${pretty(sc.root)} Blues`; sub = `Blue notes: ♭3 ${pretty(sc.notes[1])} and ♯4 ${pretty(sc.notes[3])}`; }
     else if (isMode) { title = `${pretty(sc.root)} ${sc.name}`; sub = "Mode"; }
     else { title = `${pretty(sc.root)} ${sc.name.replace("pentatonic", "Pentatonic")}`; sub = ""; }
-    if (p) sub = (sub ? sub + " · " : "") + `Pattern 1 · frets ${p.lo}–${p.hi}` + (rel || id === "blues" ? "" : " · " + notes.map(x => pretty(x.n)).join(" "));
+    if (p) sub = (sub ? sub + " · " : "") + (up && TH.upNeck ? `Up the neck · frets ${p.lo}–${p.hi}` : `Pattern 1 · frets ${p.lo}–${p.hi}`) + (rel || id === "blues" ? "" : " · " + notes.map(x => pretty(x.n)).join(" "));
     else sub = (sub ? sub + " · " : "") + `Frets 0–${FB.frets}`;
     $("thScaleTitle").innerHTML = `<h3>${title}</h3><span>${sub}</span>`;
     $("thScaleInfo").innerHTML = `<div class="thnotes">${notes.map((x, i) => `<span class="${i === 0 ? "root" : x.blue ? "blue" : ""}"><b>${pretty(x.n)}</b><small>${x.d}</small></span>`).join("")}</div>` +
@@ -5396,6 +5443,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   $("thModeView").addEventListener("click", e => { const b = e.target.closest("button[data-mv]"); if (!b) return; TH.modeView = b.dataset.mv; renderScales(); });
   $("thOtherScales").addEventListener("click", e => { const b = e.target.closest("button[data-scale]"); if (!b) return; stopTheory(); TH.scale = b.dataset.scale; renderScales(); });
   $("thKeySel").addEventListener("change", e => { stopTheory(); if (KEYS.indexOf(e.target.value) >= 0) setKey(e.target.value); });
+  $("thUpNeck").addEventListener("click", () => { if ($("thUpNeck").disabled) return; TH.upNeck = !TH.upNeck; renderScales(); });
   $("thExt").addEventListener("change", e => { TH.ext = e.target.checked; renderScales(); });
   $("thRel").addEventListener("change", e => { stopTheory(); TH.rel = e.target.checked; renderScales(); });
   $("thFull").addEventListener("change", e => { TH.full = e.target.checked; renderScales(); });
@@ -5528,7 +5576,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   // ==================================================================
   // The page asks the server for a fresh copy of itself (never from cache) when it opens and when it comes
   // back to the front. If the server has a newer version than the one running, a gold bar offers a reload.
-  const APP_VERSION = "v14.3";
+  const APP_VERSION = "v14.5";
   $("appVer").textContent = APP_VERSION;
   function checkForUpdate() {
     if (!/^https?:$/.test(location.protocol) || !window.fetch) return Promise.resolve(null);
@@ -5597,7 +5645,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
   function prefsSnapshot() {
     const o = { v: 1, sub: PREFS.sub, key: currentKey, area: NAV.area, inputs: {}, checks: {},
       tr: { q: TR.q, set: TR.set, tap: TR.tap, orient: TR.orient, num: TR.num }, cg: { q: CG.q, set: CG.set, view: CG.view },
-      th: { scale: TH.scale, labels: TH.labels, ext: TH.ext, rel: TH.rel, full: TH.full, v: 2 }, map: { pos: MAP.pos, seven: MAP.seven, sub: TC.sub }, level: LS.level, cy: { bpm: CY.bpm } };
+      th: { scale: TH.scale, labels: TH.labels, ext: TH.ext, rel: TH.rel, full: TH.full, upNeck: TH.upNeck, v: 2 }, map: { pos: MAP.pos, seven: MAP.seven, sub: TC.sub }, level: LS.level, cy: { bpm: CY.bpm } };
     PREF_INPUTS.forEach(id => { if ($(id)) o.inputs[id] = $(id).value; });
     PREF_CHECKS.forEach(id => { if ($(id)) o.checks[id] = $(id).checked; });
     return o;
@@ -5613,7 +5661,7 @@ function enablePlaybackSession() { try { if (navigator.audioSession) navigator.a
       const s = SCALE_ALIAS[p.th.scale] || p.th.scale;                   // v14.2: a saved "minPent" becomes "blues"
       TH.scale = p.th.v === 2 ? pick(s, SCALE_IDS, TH.scale) : (s === "blues" ? "blues" : TH.scale);   // older saves start on Major Pentatonic once
       TH.labels = pick(p.th.labels, ["notes", "degrees"], TH.labels);
-      if (p.th.v === 2) { TH.ext = p.th.ext === true; TH.rel = p.th.rel === true; TH.full = p.th.full === true; }
+      if (p.th.v === 2) { TH.ext = p.th.ext === true; TH.rel = p.th.rel === true; TH.full = p.th.full === true; TH.upNeck = p.th.upNeck === true; }
     }
     if (p.map) { MAP.pos = pick(p.map.pos, [1, 2], MAP.pos); MAP.seven = pick(p.map.seven, ["m7b5", "dim"], MAP.seven); }
     if (p.level >= 1 && p.level <= 3) LS.level = p.level;
